@@ -142,3 +142,7 @@
 - **Результат**: Презентация и успешная защита проекта.
 
 ---
+# Временные рамки
+
+<img width="581" alt="image" src="https://github.com/user-attachments/assets/079c2b6c-8c38-4649-823b-0e3cf16c35fa" />
+
