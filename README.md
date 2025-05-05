@@ -184,89 +184,99 @@
 
 Данные собраны с использованием различных метеорологических инструментов, таких как метеостанции, спутники, радары и другие приборы, в том числе с автоматических метеостанций, которые записывают данные в реальном времени (ежечасно, ежедневно и т.д.). Временной интервал: 01.01.2018 - 02.05.2025. Наблюдения ежечасные.
 
-## Features: 
+[РЕСУРС и дока](https://open-meteo.com/en/docs/historical-weather-api?start_date=2018-01-01&end_date=2025-05-04&csv_coordinates=Bishkek&latitude=42.873&longitude=74.5895&hourly=temperature_2m,relative_humidity_2m,precipitation,apparent_temperature,rain,snow_depth,snowfall,surface_pressure,cloud_cover,cloud_cover_low,cloud_cover_mid,cloud_cover_high,wind_speed_10m,wind_speed_100m,wind_direction_10m,wind_direction_100m,wind_gusts_10m,dew_point_2m,pressure_msl&wind_speed_unit=ms)
 
-time:
+Вы также можете скачать данные запустив код:
 
-Время, на которое зафиксированы метеорологические данные. Обычно эти данные записываются с определённой периодичностью, например, ежечасно.
+```bash
+pip install openmeteo-requests
+pip install requests-cache retry-requests numpy pandas
+```
 
-temperature_2m (°C):
+```python
+import openmeteo_requests
 
-Температура воздуха на высоте 2 метра над землёй. Это стандартный показатель температуры, используемый для оценки климата и погоды.
+import pandas as pd
+import requests_cache
+from retry_requests import retry
 
-relative_humidity_2m (%):
+# Setup the Open-Meteo API client with cache and retry on error
+cache_session = requests_cache.CachedSession('.cache', expire_after = -1)
+retry_session = retry(cache_session, retries = 5, backoff_factor = 0.2)
+openmeteo = openmeteo_requests.Client(session = retry_session)
 
-Относительная влажность воздуха на высоте 2 метра. Это процентное отношение текущего содержания водяного пара в воздухе к максимально возможному, при той же температуре, состоянию насыщения.
+# Make sure all required weather variables are listed here
+# The order of variables in hourly or daily is important to assign them correctly below
+url = "https://archive-api.open-meteo.com/v1/archive"
+params = {
+	"latitude": 42.873,
+	"longitude": 74.5895,
+	"start_date": "2018-01-01",
+	"end_date": "2025-05-04",
+	"hourly": ["temperature_2m", "relative_humidity_2m", "precipitation", "apparent_temperature", "rain", "snow_depth", "snowfall", "surface_pressure", "cloud_cover", "cloud_cover_low", "cloud_cover_mid", "cloud_cover_high", "wind_speed_10m", "wind_speed_100m", "wind_direction_10m", "wind_direction_100m", "wind_gusts_10m", "dew_point_2m", "pressure_msl"],
+	"wind_speed_unit": "ms"
+}
+responses = openmeteo.weather_api(url, params=params)
 
-precipitation (mm):
+# Process first location. Add a for-loop for multiple locations or weather models
+response = responses[0]
+print(f"Coordinates {response.Latitude()}°N {response.Longitude()}°E")
+print(f"Elevation {response.Elevation()} m asl")
+print(f"Timezone {response.Timezone()}{response.TimezoneAbbreviation()}")
+print(f"Timezone difference to GMT+0 {response.UtcOffsetSeconds()} s")
 
-Количество осадков, выпавших за определённый промежуток времени (в миллиметрах). Может включать дождь, снег и другие формы осадков.
+# Process hourly data. The order of variables needs to be the same as requested.
+hourly = response.Hourly()
+hourly_temperature_2m = hourly.Variables(0).ValuesAsNumpy()
+hourly_relative_humidity_2m = hourly.Variables(1).ValuesAsNumpy()
+hourly_precipitation = hourly.Variables(2).ValuesAsNumpy()
+hourly_apparent_temperature = hourly.Variables(3).ValuesAsNumpy()
+hourly_rain = hourly.Variables(4).ValuesAsNumpy()
+hourly_snow_depth = hourly.Variables(5).ValuesAsNumpy()
+hourly_snowfall = hourly.Variables(6).ValuesAsNumpy()
+hourly_surface_pressure = hourly.Variables(7).ValuesAsNumpy()
+hourly_cloud_cover = hourly.Variables(8).ValuesAsNumpy()
+hourly_cloud_cover_low = hourly.Variables(9).ValuesAsNumpy()
+hourly_cloud_cover_mid = hourly.Variables(10).ValuesAsNumpy()
+hourly_cloud_cover_high = hourly.Variables(11).ValuesAsNumpy()
+hourly_wind_speed_10m = hourly.Variables(12).ValuesAsNumpy()
+hourly_wind_speed_100m = hourly.Variables(13).ValuesAsNumpy()
+hourly_wind_direction_10m = hourly.Variables(14).ValuesAsNumpy()
+hourly_wind_direction_100m = hourly.Variables(15).ValuesAsNumpy()
+hourly_wind_gusts_10m = hourly.Variables(16).ValuesAsNumpy()
+hourly_dew_point_2m = hourly.Variables(17).ValuesAsNumpy()
+hourly_pressure_msl = hourly.Variables(18).ValuesAsNumpy()
 
-apparent_temperature (°C):
+hourly_data = {"date": pd.date_range(
+	start = pd.to_datetime(hourly.Time(), unit = "s", utc = True),
+	end = pd.to_datetime(hourly.TimeEnd(), unit = "s", utc = True),
+	freq = pd.Timedelta(seconds = hourly.Interval()),
+	inclusive = "left"
+)}
 
-"Ощущаемая" температура, которая учитывает не только реальную температуру воздуха, но и влияние других факторов, таких как ветер и влажность, на восприятие температуры человеком.
+hourly_data["temperature_2m"] = hourly_temperature_2m
+hourly_data["relative_humidity_2m"] = hourly_relative_humidity_2m
+hourly_data["precipitation"] = hourly_precipitation
+hourly_data["apparent_temperature"] = hourly_apparent_temperature
+hourly_data["rain"] = hourly_rain
+hourly_data["snow_depth"] = hourly_snow_depth
+hourly_data["snowfall"] = hourly_snowfall
+hourly_data["surface_pressure"] = hourly_surface_pressure
+hourly_data["cloud_cover"] = hourly_cloud_cover
+hourly_data["cloud_cover_low"] = hourly_cloud_cover_low
+hourly_data["cloud_cover_mid"] = hourly_cloud_cover_mid
+hourly_data["cloud_cover_high"] = hourly_cloud_cover_high
+hourly_data["wind_speed_10m"] = hourly_wind_speed_10m
+hourly_data["wind_speed_100m"] = hourly_wind_speed_100m
+hourly_data["wind_direction_10m"] = hourly_wind_direction_10m
+hourly_data["wind_direction_100m"] = hourly_wind_direction_100m
+hourly_data["wind_gusts_10m"] = hourly_wind_gusts_10m
+hourly_data["dew_point_2m"] = hourly_dew_point_2m
+hourly_data["pressure_msl"] = hourly_pressure_msl
 
-rain (mm):
+hourly_dataframe = pd.DataFrame(data = hourly_data)
+print(hourly_dataframe)
 
-Количество дождя, выпавшего в миллиметрах за заданный период времени. Этот показатель используется для оценки интенсивности осадков в виде дождя.
-
-snow_depth (m):
-
-Глубина снежного покрова, измеряемая в метрах. Этот показатель полезен для анализа состояния снежного покрова, особенно в регионах, где снег играет важную роль.
-
-snowfall (cm):
-
-Количество снега, выпавшего за определённый промежуток времени, измеренное в сантиметрах. Это также помогает оценить интенсивность снегопадов.
-
-surface_pressure (hPa):
-
-Атмосферное давление на уровне поверхности земли, измеряемое в гектопаскалях (hPa). Это важный показатель для прогнозирования погоды, так как изменения давления могут сигнализировать о приближении фронтов и изменении погодных условий.
-
-cloud_cover (%):
-
-Процент облачности на определённой высоте. Это показатель того, какая часть небесного свода покрыта облаками, что влияет на прогнозы погоды, такие как вероятность осадков.
-
-cloud_cover_low (%):
-
-Процент облачности на низких высотах (например, ниже 2 км). Указывает на количество облаков, находящихся на нижних уровнях атмосферы.
-
-cloud_cover_mid (%):
-
-Процент облачности на средних высотах (например, от 2 до 6 км). Важно для прогноза более высоких облаков, которые могут повлиять на различные метеорологические процессы.
-
-cloud_cover_high (%):
-
-Процент облачности на высоких высотах (выше 6 км). Облака на этих высотах могут влиять на условия, такие как образование осадков или преграды для солнечного излучения.
-
-wind_speed_10m (m/s):
-
-Скорость ветра на высоте 10 метров от земли, измеряемая в метрах в секунду. Это важный параметр для прогнозов погоды, так как сильные ветра могут изменять погодные условия и вызывать штормы.
-
-wind_speed_100m (m/s):
-
-Скорость ветра на высоте 100 метров от земли. Этот показатель используется для анализа ветровых условий на более высоких уровнях атмосферы, например, для оценки устойчивости и силы штормов.
-
-wind_direction_10m (°):
-
-Направление ветра на высоте 10 метров. Указывается в градусах (от 0° до 360°), где 0° — это север, 90° — восток, 180° — юг, и 270° — запад.
-
-wind_direction_100m (°):
-
-Направление ветра на высоте 100 метров. Этот показатель также измеряется в градусах и помогает понять поведение ветра на разных высотах.
-
-wind_gusts_10m (m/s):
-
-Скорость порывов ветра на высоте 10 метров. Порывы — это кратковременные увеличения скорости ветра, которые могут быть значительно выше средней скорости ветра.
-
-dew_point_2m (°C):
-
-Температура точки росы на высоте 2 метра. Это температура, при которой воздух становится насыщенным водяным паром и начинает конденсироваться в капли воды.
-
-pressure_msl (hPa):
-
-Атмосферное давление на уровне моря, измеряемое в гектопаскалях (hPa). Это давление, откорректированное для высоты местности, позволяет сравнивать давление в разных местах без учёта их высоты над уровнем моря.
-
-Эти данные часто собираются на основе автоматических измерений, проводимых с частотой, например, каждые 1-3 часа. Их использование широко распространено для прогнозирования погоды, анализа климатических изменений, предупреждения о стихии и других метеорологических задач.
----
+```
 
 
